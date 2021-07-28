@@ -1,0 +1,7 @@
+pypacker
+httpx
+typer
+pyyaml
+uvicorn
+starlette
+# bcc => provided by your native package manager

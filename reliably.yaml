@@ -1,0 +1,28 @@
+apiVersion: reliably.com/v1
+kind: Objective
+metadata:
+    labels:
+        name: "99% of the responses are under 150ms"
+        service: ebpf-2021-demo
+spec:
+    objectivePercent: 99.5
+    window: 1m
+    indicatorSelector:
+        category: latency
+        path: /
+        percentile: "100"
+        latency_target: 150ms
+---
+apiVersion: reliably.com/v1
+kind: Objective
+metadata:
+    labels:
+        name: "99% of the responses to our users are in the 2xx class"
+        service: ebpf-2021-demo
+spec:
+    objectivePercent: 99
+    window: 1m
+    indicatorSelector:
+        category: availability
+        path: /
+  
