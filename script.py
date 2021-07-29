@@ -1,6 +1,6 @@
 """
-This small program consumes events from an ebpf ring buffer containing HTTP
-packets over the interface listened to and sent to a local port HTTP server.
+This small program consumes events by attaching to an interface processing HTTP
+packets over it.
 
 Every window-time, we compute the ratio of responses in errors (4xx, 5xx) as
 well as the averaged latency over the window. Then we pushed these results to
@@ -89,7 +89,7 @@ def bpfsock(iface: str = IFACE):
         b.cleanup()
 
 
-def process_packets(datapoints: Queue, terminate: threading.Event,
+def process_packets(requests: Queue, terminate: threading.Event,
                     iface: str = IFACE, port: int = TARGET_PORT) -> None:
     """
     Process ebpf packets as they we get them. We parse them to HTTP data
@@ -150,7 +150,7 @@ def process_packets(datapoints: Queue, terminate: threading.Event,
                     
                     # ok we have a enough information now.
                     pt = sessions.pop(key, None)
-                    datapoints.put(pt)
+                    requests.put(pt)
 
             # oh... did the user signal to terminate...?
             if terminate.is_set():
@@ -158,7 +158,7 @@ def process_packets(datapoints: Queue, terminate: threading.Event,
 
 
 
-def process_datapoints(datapoints: Queue, indicators: Queue, 
+def process_requests(requests: Queue, indicators: Queue, 
         terminate: threading.Event, push_window: int = WINDOW):
     """
     Compute the percentages of good latencies and good responses for a given
@@ -167,32 +167,33 @@ def process_datapoints(datapoints: Queue, indicators: Queue,
     now = datetime.utcnow()
     last_push = now
     next_push = now + timedelta(seconds=push_window)
-    points_per_path = {}
+    requests_per_path = {}
 
     while not terminate.is_set():
         time.sleep(0.01)
         try:
-            pt = datapoints.get_nowait()
+            pt = requests.get_nowait()
             path = pt["path"]
-            if path not in points_per_path:
-                points_per_path[path] = []
-            points_per_path[path].append(pt)
+            if path not in requests_per_path:
+                requests_per_path[path] = []
+            requests_per_path[path].append(pt)
         except Empty:
             continue
 
         now = datetime.utcnow()
         if now >= next_push:
-            for path in points_per_path:
-                points = points_per_path[path]
-                if not points:
+            for path in requests_per_path:
+                requests = requests_per_path[path]
+                if not requests:
                     continue
 
-                points_per_path[path] = []
+                requests_per_path[path] = []
                 total_count = class_2xx = good_latency_count = 0
 
-                for pt in points:
+                for pt in requests:
                     if last_push <= pt["end"] < next_push:
                         total_count += 1
+                        # our SLO latency is 150ms
                         if pt["duration"] <= 0.15:
                             good_latency_count += 1
                         if pt["status"] == 200:
@@ -279,16 +280,16 @@ def run(reliably_config: Path = typer.Option(RELIABLY_CONFIG_PATH),
         push_window: int = typer.Option(WINDOW, help="How often will we push our indicators"),
         interface: str = typer.Option(IFACE, help="Network interface to listen to"),
         target_port: int = typer.Option(TARGET_PORT, help="Port of the HTTP server to parse requests")):
-    datapoints = Queue()
+    requests = Queue()
     indicators = Queue()
     terminate = threading.Event()
 
     packet_loop = threading.Thread(
-        None, process_packets, args=(datapoints, terminate, interface, target_port))
+        None, process_packets, args=(requests, terminate, interface, target_port))
     packet_loop.start()
 
     process_loop = threading.Thread(
-        None, process_datapoints, args=(datapoints, indicators, terminate, push_window))
+        None, process_requests, args=(requests, indicators, terminate, push_window))
     process_loop.start()
 
     slo_loop = threading.Thread(
