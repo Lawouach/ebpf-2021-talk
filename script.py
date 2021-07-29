@@ -183,20 +183,20 @@ def process_requests(requests: Queue, indicators: Queue,
         now = datetime.utcnow()
         if now >= next_push:
             for path in requests_per_path:
-                requests = requests_per_path[path]
-                if not requests:
+                reqs = requests_per_path[path]
+                if not reqs:
                     continue
 
                 requests_per_path[path] = []
                 total_count = class_2xx = good_latency_count = 0
 
-                for pt in requests:
-                    if last_push <= pt["end"] < next_push:
+                for req in reqs:
+                    if last_push <= req["end"] < next_push:
                         total_count += 1
                         # our SLO latency is 150ms
-                        if pt["duration"] <= 0.15:
+                        if req["duration"] <= 0.15:
                             good_latency_count += 1
-                        if pt["status"] == 200:
+                        if req["status"] == 200:
                             class_2xx += 1
 
                 if total_count == 0:
@@ -260,6 +260,10 @@ def update_slo(indicators: Queue, terminate: threading.Event, reliably_config: P
         if r.status_code > 399:
             type.echo(
                 f"Failed to push indicators to Reliably: {r.text}", err=True)
+        else:
+            t = typer.style(f"{indicator_type}", fg=typer.colors.BLUE)
+            v = typer.style(f"{value}", fg=typer.colors.BLUE)
+            print(f"Pushed indicator '{t}' with value {v}")
 
 
 def extract_reliably_info(reliably_config: Path) -> Dict[str, str]:
