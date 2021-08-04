@@ -263,7 +263,7 @@ def update_slo(indicators: Queue, terminate: threading.Event, reliably_config: P
         else:
             t = typer.style(f"{indicator_type}", fg=typer.colors.BLUE)
             v = typer.style(f"{value}", fg=typer.colors.BLUE)
-            print(f"Pushed indicator '{t}' with value {v}")
+            print(f"Pushed socket events as indicator '{t}' with value {v}")
 
 
 def extract_reliably_info(reliably_config: Path) -> Dict[str, str]:
