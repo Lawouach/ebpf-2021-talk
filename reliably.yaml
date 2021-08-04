@@ -2,7 +2,7 @@ apiVersion: reliably.com/v1
 kind: Objective
 metadata:
     labels:
-        name: "99% of the responses are under 150ms"
+        name: "99.5% of the responses are under 150ms"
         service: ebpf-2021-demo
 spec:
     objectivePercent: 99.5
